@@ -5,6 +5,7 @@ import json
 import logging
 import functools
 import os
+import time
 import traceback
 from typing import cast, Optional
 
@@ -258,9 +259,19 @@ def invoke(
         trigger = deployment_client.create_trigger(func, trigger_type)
     else:
         trigger = triggers[0]
+    
+    record_file = os.path.join(output_dir, "record.log")
+    
     for i in range(repetitions):
         sebs_client.logging.info(f"Beginning repetition {i+1}/{repetitions}")
+        start_time = time.time()
         ret = trigger.sync_invoke(input_config)
+        end_time = time.time()
+        latency = end_time - start_time
+        rps = 1 / latency if latency > 0 else float('inf')
+        with open(record_file, "a") as log_file:
+            log_file.write(f"{latency:.6f};{rps:.6f}\n")
+            
         if ret.stats.failure:
             sebs_client.logging.info(f"Failure on repetition {i+1}/{repetitions}")
             # deployment_client.get_invocation_error(
